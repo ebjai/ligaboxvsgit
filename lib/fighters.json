@@ -1,0 +1,24 @@
+[
+  {
+    "id": "jake-paul",
+    "name": "Jake Paul",
+    "division": "Cruiserweight",
+    "record": { "w": 9, "l": 1, "d": 0, "ko": 6 },
+    "height_cm": 185,
+    "reach_cm": 193,
+    "stance": "orthodox",
+    "elo": 1550,
+    "image": "/fighters/jake-paul.svg"
+  },
+  {
+    "id": "gervonta-davis",
+    "name": "Gervonta Davis",
+    "division": "Lightweight",
+    "record": { "w": 29, "l": 0, "d": 0, "ko": 27 },
+    "height_cm": 166,
+    "reach_cm": 171,
+    "stance": "southpaw",
+    "elo": 1620,
+    "image": "/fighters/gervonta-davis.svg"
+  }
+]

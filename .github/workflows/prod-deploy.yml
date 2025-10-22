@@ -1,0 +1,82 @@
+name: Promote to Production (Vercel)
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger:
+        description: "Reason (optional)"
+        required: false
+        default: "manual"
+  push:
+    tags:
+      - "v*.*.*" # e.g. v1.2.3 will trigger a prod deploy
+
+concurrency:
+  group: prod-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prod-deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Local health probe base during preflight (build/start on :3000)
+      SITE_URL: http://localhost:3000
+
+    steps:
+      - name: 🛎️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install deps
+        run: npm ci
+
+      - name: 🖼️ Require brand assets (block if missing)
+        run: |
+          test -f public/brand/logo.png || (echo "Missing public/brand/logo.png" && exit 1)
+          test -f public/wallpaper.png || (echo "Missing public/wallpaper.png" && exit 1)
+
+      - name: 🧬 Build fighter roster (downloads images)
+        run: npm run fighters:build
+
+      - name: 🏗️ Next build
+        run: npm run build
+
+      - name: 🚀 Start server (background)
+        run: npx next start -p 3000 &
+
+      - name: 🩺 Preflight health (local)
+        run: node scripts/ciProbe.mjs 90000
+
+      - name: ⛅ Vercel pull env (production)
+        run: npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 🧱 Vercel build (prebuilt)
+        run: npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 🚢 Vercel deploy to Production
+        id: deploy
+        run: echo "url=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})" >> $GITHUB_OUTPUT
+
+      - name: 🔗 Show Production URL
+        run: echo "Production: ${{ steps.deploy.outputs.url }}"
+
+      - name: 🧪 Production smoke (/api/health)
+        env:
+          PROD_URL: ${{ steps.deploy.outputs.url }}
+        run: npm run prod:smoke -- $PROD_URL 120000
+
+      - name: 💬 Comment Production URL on PR (if any)
+        if: github.event_name == 'pull_request'
+        uses: thollander/actions-comment-pull-request@v3
+        with:
+          message: |
+            🚀 **Promoted to Production**
+            URL: ${{ steps.deploy.outputs.url }}
+
+      - name: ✅ Mark success
+        run: echo "Production deployment healthy."

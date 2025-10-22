@@ -1,0 +1,38 @@
+name: Health CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: health-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛎️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install deps
+        run: npm ci
+
+      - name: 🖼️ Verify brand assets are committed
+        run: |
+          test -f public/brand/logo.png || (echo "Missing public/brand/logo.png" && exit 1)
+          test -f public/wallpaper.png || (echo "Missing public/wallpaper.png" && exit 1)
+
+      - name: 🧪 Health gate (build ➜ start ➜ probe)
+        env:
+          SITE_URL: http://localhost:3000
+        run: npm run health:ci
